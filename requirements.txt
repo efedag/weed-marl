@@ -1,0 +1,8 @@
+# EPyMARL ayrıca kurulacak (Pelin); torch sürümü onunla uyumlu seçilecek.
+gymnasium==1.4.0
+matplotlib==3.11.2
+numpy==2.4.6
+pandas==3.1.1
+pettingzoo==1.27.0
+pytest==9.2.0
+PyYAML==6.0.3

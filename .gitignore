@@ -1,0 +1,38 @@
+# Sanal ortamlar
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Test ve araç önbellekleri
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Büyük veri dosyaları
+data/*.npy
+
+# Ham WeedMap dosyaları
+data/raw/
+data/weedmap/
+data/WeedMap/
+data/*.zip
+data/*.tar
+data/*.tar.gz
+data/*.tif
+data/*.tiff
+
+# Editör ve işletim sistemi
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
