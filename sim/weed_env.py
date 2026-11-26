@@ -325,15 +325,29 @@ class WeedEnv(ParallelEnv):
         # Maskeyle kapalı eylem STAY sayılır
         acts = np.where(masks[np.arange(len(acts)), acts] == 1, acts, STAY)
 
-        # İlaçlama (Aşama 1'de henüz etkisi yok)
+        # İlaçlama: robot bulunduğu hücreyi ilaçlar. Maske sayesinde yalnızca
+        # yeterli bataryası olan robotlar buraya gelir. Daha önce ilaçlanmış
+        # hücre (aynı adımda başka bir robotun ilaçladığı dahil) tekrar sayılmaz.
+        spraying = acts == SPRAY
         weeds_step, unnecessary_step = 0, 0
+        for a in np.flatnonzero(spraying):
+            row, col = self.positions[a]
+            if self.sprayed[row, col]:
+                continue
+            self.sprayed[row, col] = True
+            if self.weed_mask[row, col]:
+                weeds_step += 1
+            else:
+                unnecessary_step += 1
+        self.weeds_sprayed += weeds_step
+        self.unnecessary_sprays += unnecessary_step
 
         # Hareket: ızgara dışına çıkan hareket STAY olur
         new_positions = np.clip(
             self.positions + MOVES[acts], 0, [self.height - 1, self.width - 1]
         )
         moved = (new_positions != self.positions).any(axis=1)
-        cost = np.where(moved, self._move_cost, c.stay_cost)
+        cost = np.where(moved, self._move_cost, np.where(spraying, c.spray_cost, c.stay_cost))
         self.battery = np.maximum(self.battery - cost, 0.0)
         self.path_length += moved
         self.positions = new_positions
@@ -345,6 +359,8 @@ class WeedEnv(ParallelEnv):
         team_reward = float(calculate_reward(weeds_step, unnecessary_step, c.reward))
 
         all_sprayed = not (self.weed_mask & ~self.sprayed).any()
+        if all_sprayed and self.completion_step is None:
+            self.completion_step = self.step_count
         robots_depleted = bool(self._depleted()[~self._is_drone].all())
         terminated = all_sprayed or robots_depleted
         truncated = self.step_count >= c.max_steps
@@ -528,8 +544,14 @@ class WeedEnv(ParallelEnv):
             "end_reasons": reasons,
             "messages_sent": self.channel.sent,
             "messages_lost": self.channel.lost,
+            "weeds_total": self.n_weeds,
+            "weeds_sprayed": self.weeds_sprayed,
+            "unnecessary_sprays": self.unnecessary_sprays,
+            "weed_sprayed_ratio": self.weeds_sprayed / self.n_weeds if self.n_weeds else 1.0,
+            "sprayed_area_ratio": float(self.sprayed.mean()),
             "path_length": {a: int(self.path_length[i]) for a, i in self._index.items()},
             "path_length_total": int(self.path_length.sum()),
+            "completion_step": self.completion_step,
         }
 
     # ------------------------------------------------------------------ EPyMARL yardımcıları
