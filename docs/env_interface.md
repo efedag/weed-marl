@@ -94,6 +94,30 @@ Yerel pencerenin kanalları (ajan merkezde, ızgara dışı hücreler 0):
 
 En yakın K ot, Manhattan uzaklığına göre seçilir. Eşitlik olursa satır, sonra sütun önceliklidir. K'den az ot biliniyorsa kalan yuvalar 0'dır ve geçerlilik alanı da 0 olur.
 
+## İletişim kanalı
+
+- Config'deki `channel` alanı `perfect`, `bernoulli` ya da `gilbert_elliott` olabilir. Parametreler `channel_params` içinde verilir; kanal `sim.comms.make_channel` ile kurulur.
+- Ortak arayüz (`sim/comms/base.py`):
+  - `Channel.reset(rng)`: kanalı sıfırlar.
+  - `Channel.transmit(messages) -> delivered`: mesajları gönderir, ulaşanları döndürür.
+  - Sayaçlar: `sent` (gönderilen) ve `lost` (kaybolan).
+- Her (gönderen, alıcı) bağlantısının durumu ayrı tutulur.
+
+| Kanal | `channel_params` | Davranış |
+|---|---|---|
+| `perfect` | — | Hiçbir mesaj kaybolmaz |
+| `bernoulli` | `{"p": 0.25}` | Her mesaj bağımsız olarak p olasılıkla kaybolur. Deney değerleri: p ∈ {0, 0.1, 0.25, 0.5} |
+| `gilbert_elliott` | `{"mean_loss": 0.25, "mean_burst_length": 5, "e_g": 0.0, "e_b": 1.0}` ya da ham `{"p_gb", "p_bg", "e_g", "e_b"}` | Bağlantı başına Good/Bad Markov durumu. Deney değerleri: ortalama kayıp 0.25 ve 0.5 |
+
+Gilbert-Elliott için `from_mean_loss` dönüşümü:
+- p_BG = 1 / mean_burst_length
+- π_B = (mean_loss − e_G) / (e_B − e_G)
+- p_GB = π_B · p_BG / (1 − π_B)
+
+e_G, e_B ve patlama uzunluğunun varsayılan değerleri (0, 1, 5) geçicidir; Nayak et al. (2020)'ye göre ayarlanacak.
+
+Mesajın önce o anki duruma göre kaybolup kaybolmadığına karar verilir, ardından durum geçişi yapılır. Bağlantının ilk durumu durağan dağılımdan çekilir.
+
 ## Global state (`env.state()`)
 
 Gözlemlerden ayrıdır ve yalnızca merkezi kritik içindir; hiçbir ajan gözlemine eklenmez. `Box(0, 1, (3·(N+M) + 3·S² + 1,), float32)`. Burada S = min(`state_map_size`, H, W). Varsayılan 2+2 ajan ve S = 16 ile uzunluk **781**.
