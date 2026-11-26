@@ -1,6 +1,6 @@
 # WeedEnv arayüzü
 
-`sim/weed_env.py` içindeki `WeedEnv`, PettingZoo `ParallelEnv` arayüzünü uygular. Drone'lar otları algılayıp yer robotlarına mesajla bildirir; robotlar bu raporlarla hareket eder ve (Aşama 3'ten itibaren) ilaçlar.
+`sim/weed_env.py` içindeki `WeedEnv`, PettingZoo `ParallelEnv` arayüzünü uygular. Drone'lar otları algılayıp yer robotlarına mesajla bildirir; robotlar bu raporlarla hareket eder ve ilaçlar.
 
 ```python
 from sim.weed_env import WeedEnv, WeedEnvConfig
@@ -31,10 +31,20 @@ Tüm ajanlar aynı `Discrete(6)` uzayını kullanır.
 | 2 | DOWN (satır + 1) | ✔ | ✔ |
 | 3 | LEFT (sütun − 1) | ✔ | ✔ |
 | 4 | RIGHT (sütun + 1) | ✔ | ✔ |
-| 5 | SPRAY | ✘ | ✔ (Aşama 1'de etkisiz) |
+| 5 | SPRAY | ✘ | ✔ |
 
 - Izgara dışına çıkan hareket STAY sayılır ve hareket maliyeti düşmez.
 - Maskeyle kapalı bir eylem gönderilirse STAY uygulanır.
+
+### İlaçlama (SPRAY)
+
+- Yalnızca robotlar ilaçlayabilir. Robot hareket etmeden bulunduğu hücreyi ilaçlar ve `spray_cost` kadar batarya harcar.
+- Hücre sayımı:
+  - Gerçek ot hücresi "ilaçlanan ot" (W) sayılır.
+  - Ot olmayan hücre, ürün ya da toprak fark etmeksizin "gereksiz ilaçlama" (U) sayılır.
+- Daha önce ilaçlanmış bir hücre tekrar ilaçlanırsa ne W ne U sayılır, ama batarya yine harcanır. Aynı adımda iki robot aynı hücreyi ilaçlarsa da hücre tek sayılır.
+- W ve U, o adımın ödülü için doğrudan `marl/reward.py`'ye verilir.
+- İlaçlama, aynı adımdaki hareketlerden önce, ajanların adım başındaki konumlarında uygulanır.
 
 ## Eylem maskesi
 
@@ -55,7 +65,7 @@ Izgara kenarındaki hareketler maskelenmez; bunlar STAY gibi davranır.
 - Her ajanın bir sayacı vardır. Başlangıç değeri `drone_battery` ya da `robot_battery`.
 - Gerçekten yapılan hareket `drone_move_cost` ya da `robot_move_cost` kadar düşürür.
 - STAY ve kenara çarpan hareket `stay_cost` kadar düşürür (varsayılan 0).
-- SPRAY Aşama 3'ten itibaren `spray_cost` kadar düşürür.
+- SPRAY `spray_cost` kadar düşürür.
 - Batarya 0'ın altına inmez.
 - Bataryası biten ajan yalnızca STAY yapabilir. Drone'un algılaması ve mesaj göndermesi bataryadan bağımsız sürer.
 
@@ -134,7 +144,7 @@ Gözlemlerden ayrıdır ve yalnızca merkezi kritik içindir; hiçbir ajan gözl
 
 - `marl/reward.py` içindeki `calculate_reward(W, U, config.reward)` kullanılır: `10·W − 5·U − 0.1`.
 - Takım ödülü her adımda **bir kez** hesaplanır ve her ajana aynı değer verilir. EPyMARL'da toplanırken yalnızca bir ajanınki alınmalıdır.
-- W bu adımda ilaçlanan ot sayısı, U gereksiz ilaçlama sayısıdır. Aşama 1'de ikisi de 0'dır, yani ödül her adımda −0.1.
+- W bu adımda ilaçlanan ot sayısı, U gereksiz ilaçlama sayısıdır; ilaçlama olmayan adımda ödül −0.1.
 
 ## Bitiş koşulları
 
@@ -159,7 +169,11 @@ Gözlemlerden ayrıdır ve yalnızca merkezi kritik içindir; hiçbir ajan gözl
 - `terminated`, `truncated`: bitiş bayrakları.
 - `end_reasons`: `all_weeds_sprayed`, `robots_depleted` ve `max_steps` değerlerinden geçerli olanların listesi.
 - `messages_sent`, `messages_lost`: gönderilen ve kaybolan mesaj sayısı.
+- `weeds_total`, `weeds_sprayed`, `unnecessary_sprays`: toplam ot hücresi, ilaçlanan ot ve gereksiz ilaçlama sayıları.
+- `weed_sprayed_ratio`: ilaçlanan ot oranı.
+- `sprayed_area_ratio`: ilaçlanan hücrelerin tarlaya oranı.
 - `path_length`: ajan başına yapılan hareket sayısı; `path_length_total` bunların toplamı.
+- `completion_step`: tüm otların ilaçlandığı adım; ilaçlanmadıysa `None`.
 
 ## EPyMARL yardımcıları
 
@@ -195,7 +209,7 @@ Tüm alanlar tek bir dataclass içindedir. `WeedEnvConfig.from_dict(d)` ile bir 
 | `drone_battery`, `robot_battery` | 200, 200 | Başlangıç bataryası |
 | `drone_move_cost`, `robot_move_cost` | 1, 1 | Hareket başına maliyet |
 | `stay_cost` | 0 | STAY maliyeti |
-| `spray_cost` | 1 | İlaçlama maliyeti (Aşama 3) |
+| `spray_cost` | 1 | İlaçlama maliyeti |
 | `detection_radius` | 2 | Drone algılama yarıçapı (kare) |
 | `obs_window` | 5 | Yerel pencere kenarı k (tek sayı) |
 | `n_reports` | 5 | Robot gözlemindeki en yakın ot sayısı K |
